@@ -221,11 +221,10 @@ def get_properties(dict1, dict2):
         elif prop_type == RICH_TEXT:
             property_val = {"rich_text": [{"type": "text", "text": {"content": str(value)[:MAX_LENGTH]}}]}
         elif prop_type == NUMBER:
-            property_val = {"number": value}
+            property_val = {"number": number}
         elif prop_type == STATUS:
             property_val = {"status": {"name": value}}
         elif prop_type == FILES:
-            # 封面留空，让用户在 Notion 内手动添加
             property_val = {"files": []}
         elif prop_type == DATE:
             property_val = {
@@ -472,7 +471,7 @@ class WeReadApi:
 
 class NotionHelper:
     database_name_dict = {
-        "BOOK_DATABASE_NAME": "魔法学院",  # 修改为魔法学院
+        "BOOK_DATABASE_NAME": "魔法学院",
         "REVIEW_DATABASE_NAME": "笔记",
         "BOOKMARK_DATABASE_NAME": "划线",
         "DAY_DATABASE_NAME": "日",
@@ -501,66 +500,20 @@ class NotionHelper:
             if os.getenv(key):
                 self.database_name_dict[key] = os.getenv(key)
         
-        # 在 search_database 之后添加自动创建逻辑
-book_db_name = self.database_name_dict.get("BOOK_DATABASE_NAME")
-self.book_database_id = self.database_id_dict.get(book_db_name)
-
-# 如果找不到数据库，自动创建
-if self.book_database_id is None:
-    print(f"未找到 '{book_db_name}' 数据库，正在自动创建...")
-    self.book_database_id = self.create_book_database(book_db_name)
-
-    def create_book_database(self, name):
-    """创建书籍主数据库"""
-    title = [{"type": "text", "text": {"content": name}}]
-    properties = {
-        "书名": {"title": {}},
-        "BookId": {"rich_text": {}},
-        "ISBN": {"rich_text": {}},
-        "链接": {"url": {}},
-        "作者": {"relation": {"database_id": self.author_database_id or self.page_id, "single_property": {}}},
-        "Sort": {"number": {}},
-        "评分": {"number": {}},
-        "封面": {"files": {}},
-        "分类": {"relation": {"database_id": self.category_database_id or self.page_id, "single_property": {}}},
-        "阅读状态": {"status": {"options": [{"name": "想读"}, {"name": "在读"}, {"name": "已读"}]}},
-        "阅读时长": {"number": {}},
-        "阅读进度": {"number": {}},
-        "阅读天数": {"number": {}},
-        "时间": {"date": {}},
-        "开始阅读时间": {"date": {}},
-        "最后阅读时间": {"date": {}},
-        "简介": {"rich_text": {}},
-        "书架分类": {"select": {}},
-        "我的评分": {"select": {}},
-        "豆瓣链接": {"url": {}},
-    }
-    parent = {"page_id": self.page_id, "type": "page_id"}
-    database = self.client.databases.create(
-        parent=parent,
-        title=title,
-        icon=get_icon(BOOK_ICON_URL),
-        properties=properties
-    )
-    return database.get("id")
-    
-        self.review_database_id = self.database_id_dict.get(self.database_name_dict.get("REVIEW_DATABASE_NAME"))
-        self.bookmark_database_id = self.database_id_dict.get(self.database_name_dict.get("BOOKMARK_DATABASE_NAME"))
-        self.day_database_id = self.database_id_dict.get(self.database_name_dict.get("DAY_DATABASE_NAME"))
-        self.week_database_id = self.database_id_dict.get(self.database_name_dict.get("WEEK_DATABASE_NAME"))
-        self.month_database_id = self.database_id_dict.get(self.database_name_dict.get("MONTH_DATABASE_NAME"))
-        self.year_database_id = self.database_id_dict.get(self.database_name_dict.get("YEAR_DATABASE_NAME"))
-        self.category_database_id = self.database_id_dict.get(self.database_name_dict.get("CATEGORY_DATABASE_NAME"))
-        self.author_database_id = self.database_id_dict.get(self.database_name_dict.get("AUTHOR_DATABASE_NAME"))
-        self.chapter_database_id = self.database_id_dict.get(self.database_name_dict.get("CHAPTER_DATABASE_NAME"))
-        self.read_database_id = self.database_id_dict.get(self.database_name_dict.get("READ_DATABASE_NAME"))
-        self.setting_database_id = self.database_id_dict.get(self.database_name_dict.get("SETTING_DATABASE_NAME"))
+        # 按顺序获取或创建数据库
+        self.author_database_id = self.get_or_create_database("AUTHOR_DATABASE_NAME", USER_ICON_URL)
+        self.category_database_id = self.get_or_create_database("CATEGORY_DATABASE_NAME", TAG_ICON_URL)
+        self.book_database_id = self.get_or_create_database("BOOK_DATABASE_NAME", BOOK_ICON_URL, is_main=True)
+        self.review_database_id = self.get_or_create_database("REVIEW_DATABASE_NAME", TAG_ICON_URL)
+        self.bookmark_database_id = self.get_or_create_database("BOOKMARK_DATABASE_NAME", BOOKMARK_ICON_URL)
+        self.chapter_database_id = self.get_or_create_database("CHAPTER_DATABASE_NAME", TAG_ICON_URL)
+        self.year_database_id = self.get_or_create_database("YEAR_DATABASE_NAME", TARGET_ICON_URL)
+        self.month_database_id = self.get_or_create_database("MONTH_DATABASE_NAME", TARGET_ICON_URL)
+        self.week_database_id = self.get_or_create_database("WEEK_DATABASE_NAME", TARGET_ICON_URL)
+        self.day_database_id = self.get_or_create_database("DAY_DATABASE_NAME", TARGET_ICON_URL)
+        self.read_database_id = self.get_or_create_database("READ_DATABASE_NAME", TARGET_ICON_URL)
+        self.setting_database_id = self.get_or_create_database("SETTING_DATABASE_NAME", "https://www.notion.so/icons/gear_gray.svg")
         
-        self.update_book_database()
-        if self.read_database_id is None:
-            self.create_database()
-        if self.setting_database_id is None:
-            self.create_setting_database()
         if self.setting_database_id:
             self.insert_to_setting_database()
 
@@ -578,9 +531,66 @@ if self.book_database_id is None:
             if "has_children" in child and child["has_children"]:
                 self.search_database(child["id"])
 
+    def get_or_create_database(self, env_key, icon_url, is_main=False):
+        name = self.database_name_dict.get(env_key)
+        db_id = self.database_id_dict.get(name)
+        
+        if db_id:
+            print(f"找到数据库: {name}")
+            return db_id
+        
+        print(f"创建数据库: {name}")
+        
+        if is_main:
+            return self.create_book_database(name, icon_url)
+        else:
+            return self.create_simple_database(name, icon_url)
+
+    def create_simple_database(self, name, icon_url):
+        title = [{"type": "text", "text": {"content": name}}]
+        properties = {"标题": {"title": {}}}
+        parent = {"page_id": self.page_id, "type": "page_id"}
+        database = self.client.databases.create(
+            parent=parent, title=title, icon=get_icon(icon_url), properties=properties
+        )
+        self.database_id_dict[name] = database.get("id")
+        return database.get("id")
+
+    def create_book_database(self, name, icon_url):
+        title = [{"type": "text", "text": {"content": name}}]
+        properties = {
+            "书名": {"title": {}},
+            "BookId": {"rich_text": {}},
+            "ISBN": {"rich_text": {}},
+            "链接": {"url": {}},
+            "Sort": {"number": {}},
+            "评分": {"number": {}},
+            "封面": {"files": {}},
+            "阅读状态": {"status": {"options": [{"name": "想读", "color": "gray"}, {"name": "在读", "color": "blue"}, {"name": "已读", "color": "green"}]}},
+            "阅读时长": {"number": {}},
+            "阅读进度": {"number": {"format": "percent"}},
+            "阅读天数": {"number": {}},
+            "时间": {"date": {}},
+            "开始阅读时间": {"date": {}},
+            "最后阅读时间": {"date": {}},
+            "简介": {"rich_text": {}},
+            "书架分类": {"select": {}},
+            "我的评分": {"select": {"options": [{"name": "⭐️"}, {"name": "⭐️⭐️⭐️"}, {"name": "⭐️⭐️⭐️⭐️⭐️"}, {"name": "未评分"}]}},
+            "豆瓣链接": {"url": {}},
+        }
+        parent = {"page_id": self.page_id, "type": "page_id"}
+        database = self.client.databases.create(
+            parent=parent, title=title, icon=get_icon(icon_url), properties=properties
+        )
+        db_id = database.get("id")
+        self.database_id_dict[name] = db_id
+        return db_id
+
     def update_book_database(self):
+        if not self.book_database_id:
+            return
         response = self.client.databases.retrieve(database_id=self.book_database_id)
-        id = response.get("id")
+        db_id = response.get("id")
         properties = response.get("properties")
         update_properties = {}
         
@@ -596,7 +606,7 @@ if self.book_database_id is None:
             update_properties["豆瓣短评"] = {"rich_text": {}}
         
         if update_properties:
-            self.client.databases.update(database_id=id, properties=update_properties)
+            self.client.databases.update(database_id=db_id, properties=update_properties)
 
     def create_database(self):
         title = [{"type": "text", "text": {"content": self.database_name_dict.get("READ_DATABASE_NAME")}}]
@@ -922,7 +932,6 @@ class WeReadSync:
         book["开始阅读时间"] = book.get("beginReadingDate")
         book["最后阅读时间"] = book.get("lastReadingDate")
         
-        # 封面留空，让用户在 Notion 内手动添加图片
         book["封面"] = None
         
         if bookId not in self.notion_books:
