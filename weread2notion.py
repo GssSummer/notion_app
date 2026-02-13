@@ -256,7 +256,6 @@ def get_property_value(property):
     elif prop_type in ("status", "select"):
         return content.get("name")
     elif prop_type == "files":
-        # 不考虑多文件情况
         if len(content) > 0 and content[0].get("type") == "external":
             return content[0].get("external").get("url")
         return None
@@ -534,7 +533,6 @@ class NotionHelper:
         for child in children:
             if child["type"] == "child_database":
                 self.database_id_dict[child.get("child_database").get("title")] = child.get("id")
-            # 移除热力图检测
             if "has_children" in child and child["has_children"]:
                 self.search_database(child["id"])
 
@@ -748,7 +746,6 @@ class NotionHelper:
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def update_page(self, page_id, properties, icon=None):
-        # 移除 cover 参数，不自动设置封面
         return self.client.pages.update(page_id=page_id, properties=properties, icon=icon)
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
@@ -757,7 +754,6 @@ class NotionHelper:
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
     def create_book_page(self, parent, properties, icon):
-        # 移除 cover 参数，不自动设置封面，让用户在 Notion 内手动添加
         return self.client.pages.create(parent=parent, properties=properties, icon=icon)
 
     @retry(stop_max_attempt_number=3, wait_fixed=5000)
@@ -847,7 +843,6 @@ class WeReadSync:
         self.archive_dict = {}
         self.notion_books = {}
 
-    # ----- 书籍同步 -----
     def insert_book_to_notion(self, books, index, bookId):
         book = {}
         if bookId in self.archive_dict:
@@ -885,7 +880,7 @@ class WeReadSync:
         book["开始阅读时间"] = book.get("beginReadingDate")
         book["最后阅读时间"] = book.get("lastReadingDate")
         
-        # 封面留空，不自动填充，让用户在 Notion 内手动添加图片
+        # 封面留空，让用户在 Notion 内手动添加图片
         book["封面"] = None
         
         if bookId not in self.notion_books:
@@ -914,13 +909,11 @@ class WeReadSync:
         parent = {"database_id": self.notion_helper.book_database_id, "type": "database_id"}
         
         if bookId in self.notion_books:
-            # 更新时不修改封面
             result = self.notion_helper.update_page(
                 page_id=self.notion_books.get(bookId).get("pageId"),
                 properties=properties
             )
         else:
-            # 新建时也不设置封面
             result = self.notion_helper.create_book_page(parent=parent, properties=properties, icon=get_icon(BOOK_ICON_URL))
         
         page_id = result.get("id")
@@ -989,7 +982,6 @@ class WeReadSync:
         for index, bookId in enumerate(books):
             self.insert_book_to_notion(books, index, bookId)
 
-    # ----- 笔记同步 -----
     def get_bookmark_list(self, page_id, bookId):
         filter = {
             "and": [
@@ -1168,11 +1160,7 @@ class WeReadSync:
                 self.append_blocks(pageId, content)
                 self.notion_helper.update_book_page(page_id=pageId, properties={"Sort": get_number(sort)})
 
-    # ----- 主入口 -----
     def run(self, mode="all"):
-        """
-        mode: 'all' | 'books' | 'notes'
-        """
         if mode in ("all", "books"):
             print("=== 同步书籍信息 ===")
             self.sync_books()
