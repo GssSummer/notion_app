@@ -1,4 +1,3 @@
-# .github/workflows/weread-sync.yml
 name: 微信读书同步到 Notion
 
 on:
@@ -29,7 +28,6 @@ jobs:
       CC_PASSWORD: ${{ secrets.CC_PASSWORD }}
       
       # 数据库名称（Variables，可自定义）
-      # 默认 "魔法学院"，可通过变量覆盖
       BOOK_DATABASE_NAME: ${{ vars.BOOK_DATABASE_NAME || '魔法学院' }}
       AUTHOR_DATABASE_NAME: ${{ vars.AUTHOR_DATABASE_NAME || '作者' }}
       CATEGORY_DATABASE_NAME: ${{ vars.CATEGORY_DATABASE_NAME || '分类' }}
