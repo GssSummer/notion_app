@@ -501,7 +501,49 @@ class NotionHelper:
             if os.getenv(key):
                 self.database_name_dict[key] = os.getenv(key)
         
-        self.book_database_id = self.database_id_dict.get(self.database_name_dict.get("BOOK_DATABASE_NAME"))
+        # 在 search_database 之后添加自动创建逻辑
+book_db_name = self.database_name_dict.get("BOOK_DATABASE_NAME")
+self.book_database_id = self.database_id_dict.get(book_db_name)
+
+# 如果找不到数据库，自动创建
+if self.book_database_id is None:
+    print(f"未找到 '{book_db_name}' 数据库，正在自动创建...")
+    self.book_database_id = self.create_book_database(book_db_name)
+
+    def create_book_database(self, name):
+    """创建书籍主数据库"""
+    title = [{"type": "text", "text": {"content": name}}]
+    properties = {
+        "书名": {"title": {}},
+        "BookId": {"rich_text": {}},
+        "ISBN": {"rich_text": {}},
+        "链接": {"url": {}},
+        "作者": {"relation": {"database_id": self.author_database_id or self.page_id, "single_property": {}}},
+        "Sort": {"number": {}},
+        "评分": {"number": {}},
+        "封面": {"files": {}},
+        "分类": {"relation": {"database_id": self.category_database_id or self.page_id, "single_property": {}}},
+        "阅读状态": {"status": {"options": [{"name": "想读"}, {"name": "在读"}, {"name": "已读"}]}},
+        "阅读时长": {"number": {}},
+        "阅读进度": {"number": {}},
+        "阅读天数": {"number": {}},
+        "时间": {"date": {}},
+        "开始阅读时间": {"date": {}},
+        "最后阅读时间": {"date": {}},
+        "简介": {"rich_text": {}},
+        "书架分类": {"select": {}},
+        "我的评分": {"select": {}},
+        "豆瓣链接": {"url": {}},
+    }
+    parent = {"page_id": self.page_id, "type": "page_id"}
+    database = self.client.databases.create(
+        parent=parent,
+        title=title,
+        icon=get_icon(BOOK_ICON_URL),
+        properties=properties
+    )
+    return database.get("id")
+    
         self.review_database_id = self.database_id_dict.get(self.database_name_dict.get("REVIEW_DATABASE_NAME"))
         self.bookmark_database_id = self.database_id_dict.get(self.database_name_dict.get("BOOKMARK_DATABASE_NAME"))
         self.day_database_id = self.database_id_dict.get(self.database_name_dict.get("DAY_DATABASE_NAME"))
